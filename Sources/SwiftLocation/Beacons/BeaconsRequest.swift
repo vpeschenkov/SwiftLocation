@@ -14,7 +14,7 @@ import CoreLocation
 /// BeaconsRequest represent the request entity which contains a reference
 /// to subscriber, a list of contraints to evaluate.
 /// A reference is keep on queue until its valid and you can manage the subscription
-// directly from here.
+/// directly from here.
 public class BeaconsRequest: ServiceRequest, Hashable {
     
     // MARK: - Typealiases -

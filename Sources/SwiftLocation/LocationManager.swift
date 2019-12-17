@@ -23,6 +23,7 @@ public class LocationManager: NSObject {
     internal typealias AutocompleteRequestSet = Set<AutoCompleteRequest>
     internal typealias IPRequestSet = Set<LocationByIPRequest>
     internal typealias HeadingRequestSet = Set<HeadingRequest>
+    internal typealias VisitsRequestSet = Set<VisitsRequest>
     
     public typealias QueueChange = ((_ added: Bool, _ request: ServiceRequest) -> Void)
     public typealias AuthorizationChange = ((State) -> Void)
@@ -138,6 +139,9 @@ public class LocationManager: NSObject {
     /// Heading requests.
     internal private(set) var queueHeadingRequests: HeadingRequestSet
     
+    /// Visits requests.
+    internal private(set) var queueVisitsRequests: VisitsRequestSet
+    
     /// `CLLocationManager` instance used to receive events from GPS.
     private let manager = CLLocationManager()
     
@@ -163,6 +167,7 @@ public class LocationManager: NSObject {
         queueAutocompleteRequests = AutocompleteRequestSet()
         queueLocationByIPRequests = IPRequestSet()
         queueHeadingRequests = HeadingRequestSet()
+        queueVisitsRequests = VisitsRequestSet()
         super.init()
         manager.delegate = self
         
@@ -274,7 +279,6 @@ public class LocationManager: NSObject {
         return request
     }
     
-    
     /// Asynchronously requests the current heading of the device using location services.
     /// The current heading (the most recent one acquired, regardless of accuracy level),
     /// or nil if no valid heading was acquired
@@ -293,6 +297,23 @@ public class LocationManager: NSObject {
             request.observers.add(result)
         }
         startHeadingRequest(request)
+        return request
+    }
+    
+    /// Asynchronously requests visit locations.
+    /// The current visit location (the most recent one acquired, regardless of accuracy level),
+    /// or nil if no valid visit location was acquired
+    ///
+    /// - Parameters:
+    ///   - result: callback where you will receive the result of request.
+    /// - Returns: return the request itself you can use to manage the lifecycle.
+    public func visitsSubscription(result: VisitsRequest.Callback?) -> VisitsRequest {
+        let request = VisitsRequest()
+        
+        if let result = result {
+            request.observers.add(result)
+        }
+        startVisitsRequest(request)
         return request
     }
     
@@ -416,6 +437,35 @@ public class LocationManager: NSObject {
         }
         startAutoComplete(request)
         return request
+    }
+    
+    // MARK: - Private Methods: Visits Request -
+    
+    internal func startVisitsRequest(_ request: VisitsRequest) {
+        request.state = .idle
+        let res = queueVisitsRequests.insert(request) // insert in queue
+        if res.inserted {
+            dispatchQueueChangeEvent(true, request: request)
+        }
+        self.updateVisitsSettings()
+    }
+    
+    internal func removeVisitsRequest(_ request: VisitsRequest) {
+        request.state = .expired
+        if let _ = queueVisitsRequests.remove(request) {
+            dispatchQueueChangeEvent(false, request: request)
+        }
+        self.updateVisitsSettings()
+    }
+    
+    internal func updateVisitsSettings() {
+        guard queueVisitsRequests.isEmpty == false else {
+            manager.stopMonitoringVisits()
+            return
+        }
+        /// The visits location service requires always authorization.
+        requireUserAuthorization(.always)
+        manager.startMonitoringVisits()
     }
     
     // MARK: - Private Methods: Heading Request -
@@ -734,6 +784,9 @@ extension LocationManager: CLLocationManagerDelegate {
             request.stop(reason: ErrorReason.errorReason(from: error), remove: shouldRemove)
         }
 
+        for request in queueVisitsRequests { // dispatch the error to any request
+            request.stop(reason: ErrorReason.errorReason(from: error), remove: false)
+        }
     }
     
     // MARK: - CoreLocationManagerDelegate for iBeacons
@@ -755,6 +808,14 @@ extension LocationManager: CLLocationManagerDelegate {
     public func locationManager(_ manager: CLLocationManager, didRangeBeacons beacons: [CLBeacon], in region: CLBeaconRegion) {
         for request in queueBeaconsRequests.filter ({ $0.id == region.identifier }) { // dispatch location to any request
             request.complete(beacons: beacons)
+        }
+    }
+    
+    // MARK: - CoreLocationManagerDelegate for iBeacons
+    
+    public func locationManager(_ manager: CLLocationManager, didVisit visit: CLVisit) {
+        for request in queueVisitsRequests { // dispatch the visit to any request
+            request.complete(visit: visit)
         }
     }
 }

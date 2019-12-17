@@ -24,6 +24,7 @@ class RequestsMonitorController: UIViewController {
     @IBOutlet public var countGeocodingReqs: UILabel!
     @IBOutlet public var countAutocompleteReqs: UILabel!
     @IBOutlet public var countHeadingReqs: UILabel!
+    @IBOutlet public var countVisitsReqs: UILabel!
 
     internal var completedRequests = [ServiceRequest]()
     
@@ -107,7 +108,7 @@ class RequestsMonitorController: UIViewController {
 extension RequestsMonitorController: UITableViewDataSource, UITableViewDelegate {
     
     func numberOfSections(in tableView: UITableView) -> Int {
-        return 7 // all kinds + completed requests
+        return 8 // all kinds + completed requests
     }
     
     func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
@@ -127,8 +128,10 @@ extension RequestsMonitorController: UITableViewDataSource, UITableViewDelegate 
         case 4:
             return "\(count) HEADING"
         case 5:
-            return "\(count) AUTOCOMPLETE"
+            return "\(count) VISITS"
         case 6:
+            return "\(count) AUTOCOMPLETE"
+        case 7:
             return "COMPLETED REQUESTS"
         default:
             return nil
@@ -148,8 +151,10 @@ extension RequestsMonitorController: UITableViewDataSource, UITableViewDelegate 
         case 4:
             return Array(locator.queueHeadingRequests)
         case 5:
-            return Array(locator.queueAutocompleteRequests)
+            return Array(locator.queueVisitsRequests)
         case 6:
+            return Array(locator.queueAutocompleteRequests)
+        case 7:
             return completedRequests
         default:
             return []
@@ -233,6 +238,7 @@ extension RequestsMonitorController: UITableViewDataSource, UITableViewDelegate 
     public func reload() {
         table.reloadData()
      
+        countVisitsReqs.text = String(locator.queueVisitsRequests.count)
         countHeadingReqs.text = String(locator.queueHeadingRequests.count)
         countLocationReqs.text = String(locator.queueLocationRequests.count)
         countBeaconsReqs.text = String(locator.queueBeaconsRequests.count)
